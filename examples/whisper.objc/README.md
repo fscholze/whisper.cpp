@@ -40,3 +40,63 @@ whisper_init_state: loading Core ML model from '/Library/Developer/CoreSimulator
 whisper_init_state: first run on a device may take a while ...
 whisper_init_state: Core ML model loaded
 ```
+
+## Info za Serbski Model
+1. Do `whisper.objc` rjadowaka recne modele `ggml-large-v3-turbo.bin` a `ggml-large-v3-turbo-encoder.mlmodelc` sunc
+2. W `whisper.objc/ViewController` te mejno modela zmenic:
+```
+- (void)viewDidLoad {
+    [super viewDidLoad];
+
+    // whisper.cpp initialization
+    {
+        // load the model
+        NSString *modelPath = [[NSBundle mainBundle] pathForResource:@"ggml-large-v3-turbo" ofType:@"bin"];
+
+        // check if the model exists
+        if (![[NSFileManager defaultManager] fileExistsAtPath:modelPath]) {
+            NSLog(@"Model file not found");
+            return;
+        }
+````
+3. W `whisper.objc/ViewController` `params.translate` na `true` a `params.language` na `"czech"` zmenic:
+```
+- (IBAction)onTranscribe:(id)sender {
+    if (stateInp.isTranscribing) {
+        return;
+    }
+
+    NSLog(@"Processing %d samples", stateInp.n_samples);
+
+    stateInp.isTranscribing = true;
+
+    // dispatch the model to a background thread
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        // process captured audio
+        // convert I16 to F32
+        for (int i = 0; i < self->stateInp.n_samples; i++) {
+            self->stateInp.audioBufferF32[i] = (float)self->stateInp.audioBufferI16[i] / 32768.0f;
+        }
+
+        // run the model
+        struct whisper_full_params params = whisper_full_default_params(WHISPER_SAMPLING_GREEDY);
+
+        // get maximum number of threads on this device (max 8)
+        const int max_threads = MIN(8, (int)[[NSProcessInfo processInfo] processorCount]);
+
+        params.print_realtime   = true;
+        params.print_progress   = false;
+        params.print_timestamps = true;
+        params.print_special    = false;
+        params.translate        = true;
+        params.language         = "czech";
+        params.n_threads        = max_threads;
+        params.offset_ms        = 0;
+        params.no_context       = true;
+        params.single_segment   = self->stateInp.isRealtime;
+        params.no_timestamps    = params.single_segment;
+```
+
+
+
+
